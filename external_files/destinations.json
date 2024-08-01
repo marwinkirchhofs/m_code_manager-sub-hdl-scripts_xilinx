@@ -1,0 +1,6 @@
+{
+    "makefile_top": {
+        "destination": "top",
+        "destination_name": "makefile"
+    }
+}

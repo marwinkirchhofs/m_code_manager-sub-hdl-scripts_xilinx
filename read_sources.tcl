@@ -1,7 +1,7 @@
 
 proc mcm_prj_read_hdl_sources {} {
-    set dir_rtl "_T_DIR_RTL_T_"
-    set dir_tb "_T_DIR_TB_T_"
+    set dir_rtl "rtl"
+    set dir_tb "tb"
     
     # TODO: if there are problems with vivado file read/compile order (e.g. for 
     # sv packages), separate the variables into module and package/interface 
@@ -21,7 +21,7 @@ proc mcm_prj_read_hdl_sources {} {
 }
 
 proc mcm_prj_read_constraints {} {
-    set dir_constraints "_T_DIR_CONSTRAINTS_T_"
+    set dir_constraints "constraints"
     set constraint_files [glob -type f -directory [file normalize ${dir_constraints}] *.xdc]
 
     read_xdc -unmanaged ${constraint_files}

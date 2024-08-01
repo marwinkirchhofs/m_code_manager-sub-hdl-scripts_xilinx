@@ -80,7 +80,7 @@ proc _mcm_xips_process_xip_dict {xips} {
 
 proc mcm_xips_generate_xips {} {
     # iterate through all RTL modules and process their IPs
-    set list_xip_files [glob -nocomplain _T_DIR_XILINX_IPS_T_/xips_*.tcl]
+    set list_xip_files [glob -nocomplain xips/xips_*.tcl]
     foreach xip_file $list_xip_files {
         source $xip_file
         puts $xips

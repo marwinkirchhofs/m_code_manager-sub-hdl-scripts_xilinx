@@ -37,10 +37,10 @@ package require json
 # SCRIPT SETUP
 ############################################################
 
-set dir_hw_export _T_DIR_HW_EXPORT_T_
+set dir_hw_export hw_export
 
 set d_project_config [::json::json2dict                             \
-                    [read [open _T_FILE_PROJECT_CONFIG_T_ r]]]
+                    [read [open project_config.json r]]]
 set hw_build_name [dict get $d_project_config hw_version]
 set hw_build_path [file join $dir_hw_export $hw_build_name]
 
@@ -59,7 +59,7 @@ if {[dict exists $d_project_config vio_top]} {
 set name_vio_core_inst inst_xip_vio_ctrl_${name_vio_module}
 # parse vio signal description json file and vivado-generated debug probes file
 # (which in fact is also json)
-set vio_ctrl_cores [::json::json2dict [read [open _T_FILE_XILINX_VIO_CONTROL_SIGNALS_CONFIG_T_ r]]]
+set vio_ctrl_cores [::json::json2dict [read [open vio_ctrl_signals.json r]]]
 set vio_ctrl_signals [dict get $vio_ctrl_cores $name_vio_module]
 set vio_ltx_data [::json::json2dict [read [open $probes_file r]]]
 
@@ -117,7 +117,7 @@ proc _mcm_vio_get_config_probes_file {} {
     global dir_hw_export
 
     set d_project_config [::json::json2dict                                     \
-                        [read [open _T_FILE_PROJECT_CONFIG_T_ r]]]
+                        [read [open project_config.json r]]]
     set hw_build_name [dict get $d_project_config hw_version]
     set hw_build_path [file join $dir_hw_export $hw_build_name]
 

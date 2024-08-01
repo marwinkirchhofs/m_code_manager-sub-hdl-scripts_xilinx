@@ -14,7 +14,7 @@ proc mcm_prj_update {} {
     # update the vivado project, based on the variables as they are set in the 
     # project config json file
     set d_project_config [::json::json2dict                             \
-                        [read [open _T_FILE_PROJECT_CONFIG_T_ r]]]
+                        [read [open project_config.json r]]]
     set part        [dict get $d_project_config part]
     set board_part  [dict get $d_project_config board_part]
     set top         [dict get $d_project_config top]
@@ -35,7 +35,7 @@ if {[info exists ::argv0] && $::argv0 eq [info script]} {
     # act on tcl argument: if none is given, build the hardware
     if {$argc >= 1} {
         switch [lindex $argv 0] {
-            _T_COMMAND_UPDATE_T_ {
+            update_project {
                 open_project [glob _vivado_prj/*.xpr]
                 mcm_prj_update
             }

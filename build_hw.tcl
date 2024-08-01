@@ -1,8 +1,8 @@
 
 package require json
 
-set dir_xilinx_log _T_DIR_XILINX_HW_BUILD_LOG_T_
-set dir_hw_export _T_DIR_HW_EXPORT_T_
+set dir_xilinx_log hw_build_log
+set dir_hw_export hw_export
 set dir_hw_export_latest [file join $dir_hw_export latest]
 
 proc mcm_build_run_synthesis {} {
@@ -83,7 +83,7 @@ proc mcm_run_program_fpga {} {
 
     # determine selected hardware build
     set d_project_config [::json::json2dict                             \
-                        [read [open _T_FILE_PROJECT_CONFIG_T_ r]]]
+                        [read [open project_config.json r]]]
     set hw_build_name [dict get $d_project_config hw_version]
     set hw_build_path [file join $dir_hw_export $hw_build_name]
 
@@ -101,11 +101,11 @@ if {[info exists ::argv0] && $::argv0 eq [info script]} {
     # act on tcl argument: if none is given, build the hardware
     if {$argc >= 1} {
         switch [lindex $argv 0] {
-            _T_COMMAND_BUILD_HW_T_ {
+            build_hw {
                 mcm_build_run_synthesis
                 mcm_build_run_implementation
             }
-            _T_COMMAND_PROG_FPGA_T_ {
+            program_fpga {
                 mcm_run_program_fpga
             }
         }

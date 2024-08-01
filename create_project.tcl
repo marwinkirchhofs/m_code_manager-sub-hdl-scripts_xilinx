@@ -1,7 +1,8 @@
 
-source _T_DIR_SCRIPTS_T_/_T_SCRIPT_SOURCE_HELPERS_T_
+source scripts_xil/source_helper_scripts.tcl
 
-set vivado_prj_name _T_PRJ_NAME_T_
+# project name: directory name two hierarchy levels upwards
+set vivado_prj_name [file tail [file dirname [file dirname [file normalize [info script]]]]]
 set vivado_prj_dir _vivado_prj
 
 ##############################
@@ -15,8 +16,10 @@ if {[file exists ${vivado_prj_dir}/${vivado_prj_name}.xpr] == 0} {
 }
 
 set_property default_lib              xil_defaultlib [current_project]
-set_property simulator_language       _T_SIMULATOR_LANGUAGE_T_ [current_project]
-set_property target_language          _T_TARGET_LANGUAGE_T_ [current_project]
+# TODO: these both need to be set in a more elegant way, maybe via 
+# project_config
+set_property simulator_language       Mixed [current_project]
+set_property target_language          Verilog [current_project]
 
 # create filesets (if not found)
 if {[string equal [get_filesets -quiet sources_1] ""]} {
@@ -57,6 +60,6 @@ mcm_prj_update
 
 # TODO: add block design generation
 
-if { [file exists _T_DIR_SCRIPTS_T_/_T_SCRIPT_XILINX_IP_GENERATION_T_] == 1} {
+if { [file exists scripts_xil/generate_xips.tcl] == 1} {
     mcm_xips_generate_xips
 }
