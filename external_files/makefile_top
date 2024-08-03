@@ -32,6 +32,10 @@ COMMAND_PROG_FPGA		:= program_fpga
 .PHONY: project
 project: ${XIL_PRJ}
 
+# TODO: PHONY target to rerun the project generation as long as there is no 
+# other good way to update the project from the project config, nothing depends 
+# on this target at this point
+.PHONY: ${XIL_PRJ}
 ${XIL_PRJ}:
 	${XIL_TOOL} -mode batch -source ${SCRIPT_CREATE_PROJECT}
 
@@ -65,6 +69,10 @@ ${DIR_XIPS}/xips_debug_cores_%.tcl: ${DIR_RTL}/%.*
 xips:	xip_ctrl
 	${XIL_TOOL} -mode batch -source ${SCRIPT_GENERATE_XIPS} ${XIL_PRJ}
 
+.PHONY: xip_export_sim
+xip_export_sim:
+	@make -C ${DIR_SIM} xip_export_sim
+
 ##############################
 # LINTING
 ##############################
@@ -81,35 +89,45 @@ xips:	xip_ctrl
 
 # convenience target to refer to vl_lint
 .PHONY: lint
-lint:	vl_lint
+lint:	verilator_lint
 
-.PHONY: vl_lint
-vl_lint:
-	@make -C ${DIR_SIM} vl_lint vl_opts="${vl_opts}"
+.PHONY: verilator_lint
+verilator_lint:
+	@make -C ${DIR_SIM} verilator_lint opts="${opts}"
 
 ##############################
 # SIMULATION
 ##############################
 
-.PHONY: vl_start_gui
-vl_start_gui:
-	@make -C ${DIR_SIM} vl_start_gui
+.PHONY: verilator_start_gui
+verilator_start_gui:
+	@make -C ${DIR_SIM} verilator_start_gui
 
 .PHONY: sim
 sim:
 	@make -C ${DIR_SIM} sim
 
-.PHONY: vl_sim
+.PHONY: sim_gui
+sim_gui:
+	@make -C ${DIR_SIM} sim_gui
+
+.PHONY: verilator_sim
 # vl_sim:			hls_synth
-vl_sim:
-	@make -C ${DIR_SIM} vl_sim
+verilator_sim:
+	@make -C ${DIR_SIM} verilator_sim
 
-.PHONY: vl_build
+.PHONY: verilator_build
 # vl_build:		hls_synth
-vl_build:
-	@make -C ${DIR_SIM} vl_build
+verilator_build:
+	@make -C ${DIR_SIM} verilator_build
 
-# add direct access to other simulators here
+.PHONY: modelsim_sim
+modelsim_sim:
+	@make -C ${DIR_SIM} modelsim_sim
+
+.PHONY: modelsim_compile
+modelsim_compile:
+	@make -C ${DIR_SIM} modelsim_compile
 
 ##############################
 # HW BUILD
@@ -168,3 +186,5 @@ run: run_hw_ctrl
 .PHONY: run_hw_ctrl
 run_hw_ctrl:
 	${XIL_TOOL} -mode tcl -source ${SCRIPT_VIO_CTRL}
+
+# vim: ft=make
