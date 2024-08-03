@@ -1,6 +1,12 @@
 # HELPER FUNCTIONS FOR XIP GENERATION AND INTEGRATION
 # turns a dictionary describing xips into generated IP within a vivado project 
 
+package require json
+
+set dir_prj_top [file dirname [file dirname [info script]]]
+set d_project_config [::json::json2dict                             \
+                    [read [open $dir_prj_top/project_config.json r]]]
+set xil_ip_precompile_path [dict get $d_project_config xil_ip_precompile_path]
 
 ############################################################
 # HELPERS
@@ -91,11 +97,31 @@ proc mcm_xips_generate_xips {} {
     # they'll be automatically launched during build if they are not up-to-date)
 }
 
+# TODO: check what is the best way of dealing with debug cores (either exclude 
+# them, because useless in simulation, or include them because otherwise 
+# a design can break)
+proc mcm_xips_export_sim {simulator export_dir} {
+    global xil_ip_precompile_path
+    export_simulation   -lib_map_path $xil_ip_precompile_path/$simulator    \
+                        -of_objects [get_ips] -simulator $simulator         \
+                        -directory $export_dir -absolute_path -force
+}
+
 
 ############################################################
 # SCRIPT "MAIN"
 ############################################################
 
 if {[info exists ::argv0] && $::argv0 eq [info script]} {
-    mcm_xips_generate_xips
+    if {$argc >= 1} {
+        switch [lindex $argv 0] {
+            export_sim {
+                # $argv[1]: simulator - $argv[2]: simulation scripts output 
+                # directory
+                mcm_xips_export_sim [lindex $argv 1] [lindex $argv 2]
+            }
+        }
+    } else {
+        mcm_xips_generate_xips
+    }
 }
