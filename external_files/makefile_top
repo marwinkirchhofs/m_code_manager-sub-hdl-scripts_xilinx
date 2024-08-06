@@ -8,12 +8,12 @@ XIL_PRJ			:= _vivado_prj/${XIL_PRJ_NAME}.xpr
 SHELL			:= bash
 
 DIR_SCRIPTS_XIL := ${DIR_PRJ_TOP}/scripts_xil
-
-GET_PRJ_CONFIG_VAR	:= python3 ${FILE_READ_JSON_VAR} ${FILE_PROJECT_CONFIG}
+DIR_XIP_CTRL	:= ${DIR_PRJ_TOP}/xip_ctrl
 
 # language-independent by the classic trick: assume there is only one file that 
 # is named <top>.<file_ending>
-FILE_RTL_TOP	:= $(wildcard ${DIR_RTL}/$(shell ${GET_PRJ_CONFIG_VAR} top).*)
+FILE_RTL_TOP	:= $(wildcard ${DIR_RTL}/$(call fun_get_prj_config_var,top).*)
+VIO_CTRL_TOP	:= $(call fun_get_prj_config_var,vio_top)
 
 SCRIPT_CREATE_PROJECT	:= ${DIR_SCRIPTS_XIL}/create_project.tcl
 SCRIPT_MANAGE_PROJECT	:= ${DIR_SCRIPTS_XIL}/manage_project.tcl
@@ -21,7 +21,11 @@ SCRIPT_READ_SOURCES		:= ${DIR_SCRIPTS_XIL}/read_sources.tcl
 SCRIPT_SOURCE_HELPERS	:= ${DIR_SCRIPTS_XIL}/source_helper_scripts.tcl
 SCRIPT_GENERATE_XIPS	:= ${DIR_SCRIPTS_XIL}/generate_xips.tcl
 SCRIPT_BUILD_HW			:= ${DIR_SCRIPTS_XIL}/build_hw.tcl
+ifneq (,$(wildcard ${DIR_XIP_CTRL}/${VIO_CTRL_TOP}_vio_ctrl.tcl))
+SCRIPT_VIO_CTRL			:= ${DIR_XIP_CTRL}/${VIO_CTRL_TOP}_vio_ctrl.tcl
+else
 SCRIPT_VIO_CTRL			:= ${DIR_SCRIPTS_XIL}/vio_ctrl.tcl
+endif
 
 COMMAND_PROG_FPGA		:= program_fpga
 
