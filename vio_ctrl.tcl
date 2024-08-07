@@ -97,18 +97,6 @@ set vio_port_direction_identifiers [dict create                                 
     out                             "OUTPUT_VALUE"                              \
 ]
 
-##############################
-# SYSTEM
-##############################
-
-# TODO: support these kind of dicts in the getter/setter methods
-set dict_switches_status [dict create                                           \
-    "1000"                          0                                           \
-    "0100"                          1                                           \
-    "0010"                          2                                           \
-    "0001"                          3                                           \
-]
-
 
 ############################################################
 # VIO INITIALIZATION
