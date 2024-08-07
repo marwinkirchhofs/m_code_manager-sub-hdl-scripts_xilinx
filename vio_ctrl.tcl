@@ -37,7 +37,9 @@ package require json
 # SCRIPT SETUP
 ############################################################
 
-set dir_hw_export hw_export
+set dir_hw_export   hw_export
+set dir_xip_ctrl    xip_ctrl
+set file_vio_ctrl_cores [file join $dir_xip_ctrl vio_ctrl_signals.json]
 
 set d_project_config [::json::json2dict                             \
                     [read [open project_config.json r]]]
@@ -59,7 +61,8 @@ if {[dict exists $d_project_config vio_top]} {
 set name_vio_core_inst inst_xip_vio_ctrl_${name_vio_module}
 # parse vio signal description json file and vivado-generated debug probes file
 # (which in fact is also json)
-set vio_ctrl_cores [::json::json2dict [read [open vio_ctrl_signals.json r]]]
+# set vio_ctrl_cores [::json::json2dict [read [open vio_ctrl_signals.json r]]]
+set vio_ctrl_cores [::json::json2dict [read [open $file_vio_ctrl_cores r]]]
 set vio_ctrl_signals [dict get $vio_ctrl_cores $name_vio_module]
 set vio_ltx_data [::json::json2dict [read [open $probes_file r]]]
 
