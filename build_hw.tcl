@@ -2,7 +2,7 @@
 package require json
 
 set dir_xilinx_log hw_build_log
-set dir_hw_export hw_export
+set dir_hw_export build
 set dir_hw_export_latest [file join $dir_hw_export latest]
 
 proc mcm_build_run_synthesis {} {

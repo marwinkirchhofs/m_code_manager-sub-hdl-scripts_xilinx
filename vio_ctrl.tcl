@@ -37,7 +37,7 @@ package require json
 # SCRIPT SETUP
 ############################################################
 
-set dir_hw_export   hw_export
+set dir_hw_export   build
 set dir_xip_ctrl    xip_ctrl
 set file_vio_ctrl_cores [file join $dir_xip_ctrl vio_ctrl_signals.json]
 
