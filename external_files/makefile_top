@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+ifndef _MAKE_TOP_
+_MAKE_TOP_ := 1
+
 include var.mk
 
 XIL_TOOL 		:= vivado
@@ -190,5 +193,16 @@ run: run_hw_ctrl
 .PHONY: run_hw_ctrl
 run_hw_ctrl:
 	${XIL_TOOL} -mode tcl -source ${SCRIPT_VIO_CTRL}
+
+# why do the include at the bottom, and not at the top of the makefile? In pure 
+# theory, this way user.mk can override top level makefile targets. Might be 
+# a rare case, because you completely remove the top level target (it's not like 
+# inheritance), but at least it's possible. And with the include at the top of 
+# the file the top level targets would override user targets.
+ifneq (,$(wildcard ${FILE_USER_MK}))
+include ${FILE_USER_MK}
+endif
+
+endif
 
 # vim: ft=make
