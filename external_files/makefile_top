@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-include var.make
+include var.mk
 
 XIL_TOOL 		:= vivado
 XIL_PRJ_NAME	:= ${PRJ_NAME}
