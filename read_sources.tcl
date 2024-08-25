@@ -1,4 +1,6 @@
 
+source scripts/util.tcl
+
 proc mcm_prj_read_hdl_sources {} {
     set dir_rtl "rtl"
     set dir_tb "tb"
@@ -6,11 +8,11 @@ proc mcm_prj_read_hdl_sources {} {
     # TODO: if there are problems with vivado file read/compile order (e.g. for 
     # sv packages), separate the variables into module and package/interface 
     # code)
-    set rtl_sv          [glob -nocomplain -type f -directory $dir_rtl *.sv]
-    set rtl_vlog        [glob -nocomplain -type f -directory $dir_rtl *.v]
-    set rtl_vhdl        [glob -nocomplain -type f -directory $dir_rtl *.vhd]
-    set tb_generic_sv   [glob -nocomplain -type f -directory $dir_tb *.sv]
-    set tb_sv           [glob -nocomplain -type f -directory $dir_tb */*.sv]
+    set rtl_sv          [mcm_util_find_files $dir_rtl *.sv]
+    set rtl_vlog        [mcm_util_find_files $dir_rtl *.v]
+    set rtl_vhdl        [mcm_util_find_files $dir_rtl *.vhd]
+    set tb_generic_sv   [mcm_util_find_files $dir_tb *.sv]
+    set tb_sv           [mcm_util_find_files $dir_tb */*.sv]
     
     # TODO: think about an option to support libraries
     if {[llength $rtl_sv] != 0}         { add_files -fileset sources_1 $rtl_sv }
