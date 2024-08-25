@@ -118,6 +118,10 @@ sim:
 sim_gui:
 	@make -C ${DIR_SIM} sim_gui
 
+.PHONY: sim_compile
+sim_compile:
+	@make -C ${DIR_SIM} compile
+
 .PHONY: verilator_sim
 # vl_sim:			hls_synth
 verilator_sim:
