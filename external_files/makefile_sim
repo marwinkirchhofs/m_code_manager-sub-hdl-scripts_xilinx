@@ -105,9 +105,10 @@ ${SIMULATOR}_xip_%_compile:		${DIR_XIPS_SIM_OUT}/xip_%/${SIMULATOR}/${SIMULATOR}
 # particular IP, such that you don't include potentially breaking stuff that you 
 # can't use in simulation anyway.
 ${DIR_XIPS_SIM_OUT}/xip_%/${SIMULATOR}/${SIMULATOR}_lib:
-	cd $(dir $@) && source xip_$*.sh || touch simulation_failed
-	[[ -d $@/msim/xil_defaultlib/xip_$*_opt ]] && rm -rd $@/msim/xil_defaultlib/xip_$*_opt
-	cp $(abspath $(dir $@))/*.mem ${SIMULATOR}
+	cd $(dir $@) && ( [[ -s xip_$*.sh ]] && source xip_$*.sh ) || touch simulation_failed
+	[[ -d $@/msim/xil_defaultlib/xip_$*_opt ]] && rm -rd $@/msim/xil_defaultlib/xip_$*_opt || :
+	[[ -z "$(find $(abspath $(dir $@)) -name '*.mem')" ]] || 	\
+		cp $(abspath $(dir $@))/*.mem ${SIMULATOR}
 
 .PHONY: xip_export_sim
 xip_export_sim:	${DIR_XIPS_SIM_OUT}
