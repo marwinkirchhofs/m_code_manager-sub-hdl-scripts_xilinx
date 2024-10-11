@@ -1,4 +1,14 @@
 
+# CALLING
+# when called, the scripts (re-)generates the IP xo export for alveo by 
+# directing the call to mcm_alveo_ip_export. The arguments are the same as to 
+# that function:
+# $1 - ip configuration file (the json file that _mcm_alveo_ip_load_user_config 
+# needs and specifies)
+# $2 - the export directory. The script will create an `ip` and an `xo` 
+# directory at that path, holding the temporary ip configuration project and the 
+# exported final xo respectively.
+
 package require json
 
 source scripts_xil/read_sources.tcl
@@ -16,9 +26,9 @@ set prj_name [file tail [file dirname [file dirname [file normalize [info script
 set file_ip_config "alveo_ip_config.json"
 
 set dir_build "build"
-# TODO: maybe it's not the best idea to hard-code the IP directory, maybe it's 
-# a good idea, we'll see
-set dir_alveo_export [file join $dir_build "alveo_export"]
+# TODO: turned out: it was a stupid idea to hardcode the IP output directory, so 
+# please fix that and make that an argument to the script
+set dir_alveo_export [file join $dir_build "alveo"]
 set dir_ip [file join $dir_alveo_export "ip"]
 set dir_xo [file join $dir_alveo_export "xo"]
 
@@ -27,8 +37,15 @@ set dir_xo [file join $dir_alveo_export "xo"]
 # HELPER FUNCTIONS
 ############################################################
 
-proc _mcm_alveo_ip_get_ip_name {} {
-    global file_ip_config
+proc _mcm_alveo_ip_get_dir_ip {dir_alveo_export} {
+    return [file join $dir_alveo_export "ip"]
+}
+
+proc _mcm_alveo_ip_get_dir_xo {dir_alveo_export} {
+    return [file join $dir_alveo_export "xo"]
+}
+
+proc _mcm_alveo_ip_get_ip_name {file_ip_config} {
 
     set d_ip_config [::json::json2dict [read [open $file_ip_config r]]]
     if {[dict exists $d_ip_config "name"]} {
@@ -95,8 +112,7 @@ proc _mcm_alveo_ip_associate_mem_busif {reg_name bus_if_name} {
 # anything that is there already to be sure that the export is clean.
 proc _mcm_alveo_ip_prj {} {
     # TODO
-#     create_project -in_memory
-    create_project -force _temp_ip_prj
+    create_project -in_memory
     _mcm_prj_read_hdl_sources_synth
     # TODO: it might be necessary to also process constraints here, don't know 
     # if you apply them in the IP or later when you do the implementation in 
@@ -109,18 +125,18 @@ proc _mcm_alveo_ip_prj {} {
     set_property top $top [get_filesets sources_1]
 }
 
-proc _mcm_alveo_ip_package_core {} {
-    global dir_ip
+proc _mcm_alveo_ip_package_core {dir_alveo_export} {
+    set dir_ip [_mcm_alveo_ip_get_dir_ip $dir_alveo_export]
     ipx::package_project -root_dir $dir_ip \
         -vendor user.org -library rtl_kernel \
         -taxonomy /KernelIP -import_files -set_current false
     ipx::unload_core $dir_ip/component.xml
 }
 
-proc _mcm_alveo_ip_export_xo {} {
-    global dir_ip
-    global dir_xo
-    set ip_name [_mcm_alveo_ip_get_ip_name]
+proc _mcm_alveo_ip_export_xo {file_ip_config dir_alveo_export} {
+    set dir_ip [_mcm_alveo_ip_get_dir_ip $dir_alveo_export]
+    set dir_xo [_mcm_alveo_ip_get_dir_xo $dir_alveo_export]
+    set ip_name [_mcm_alveo_ip_get_ip_name $file_ip_config]
     set file_xo [file join $dir_xo ${ip_name}.xo]
     if {[file exists $file_xo]} {
         file delete -force $file_xo
@@ -173,8 +189,6 @@ proc _mcm_alveo_ip_load_user_config {file_ip_config} {
         # TODO: seems like that part just doesn't work yet, fix it
         if {[dict exists $intf_config "registers"]} {
             dict for {reg_name reg_config} [dict get $intf_config "registers"] {
-                puts $reg_name
-                puts $reg_config
                 _mcm_alveo_ip_create_register           \
                         $reg_name                       \
                         [dict get $reg_config "size"]   \
@@ -210,8 +224,8 @@ proc _mcm_alveo_ip_enable_vitis {} {
     set_property ipi_drc {ignore_freq_hz true} $core
 }
 
-proc _mcm_alveo_ip_edit_in_prj {} {
-    global dir_ip
+proc _mcm_alveo_ip_edit_in_prj {dir_alveo_export} {
+    set dir_ip [_mcm_alveo_ip_get_dir_ip $dir_alveo_export]
     ipx::edit_ip_in_project -upgrade true -name tmp_edit_project \
         -directory $dir_ip $dir_ip/component.xml
 }
@@ -226,16 +240,14 @@ proc _mcm_alveo_ip_edit_in_prj {} {
 # TODO: where to set up the clock associations, register coniguration etc? there 
 # needs to be some user-editable file in a nice format (probably json because 
 # vivado) at a specific location.
-proc mcm_alveo_ip_export {} {
-    global file_ip_config
-    global dir_ip
+proc mcm_alveo_ip_export {file_ip_config dir_alveo_export} {
 
     # create in-memory-project
     _mcm_alveo_ip_prj
     # package IP
-    _mcm_alveo_ip_package_core
+    _mcm_alveo_ip_package_core $dir_alveo_export
     # open IP in project
-    _mcm_alveo_ip_edit_in_prj
+    _mcm_alveo_ip_edit_in_prj $dir_alveo_export
     # configure IP
     _mcm_alveo_ip_configure $file_ip_config
 
@@ -247,9 +259,9 @@ proc mcm_alveo_ip_export {} {
     ipx::save_core [ipx::current_core]
     close_project -delete
 
-    _mcm_alveo_ip_export_xo
+    _mcm_alveo_ip_export_xo $file_ip_config $dir_alveo_export
 }
 
 if {[info exists ::argv0] && $::argv0 eq [info script]} {
-    mcm_alveo_ip_export
+    mcm_alveo_ip_export {*}$argv
 }
