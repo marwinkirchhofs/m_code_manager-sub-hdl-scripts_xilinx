@@ -31,6 +31,8 @@ else
 SCRIPT_VIO_CTRL			:= ${DIR_SCRIPTS_XIL}/vio_ctrl.tcl
 endif
 
+SRC_XDC					:= $(wildcard ${DIR_CONSTRAINTS}/*.xdc)
+
 ##############################
 # IP SOURCES
 ##############################
