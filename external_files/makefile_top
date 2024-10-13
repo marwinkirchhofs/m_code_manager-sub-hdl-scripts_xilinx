@@ -10,7 +10,7 @@ SHELL			:= bash
 
 # language-independent by the classic trick: assume there is only one file that 
 # is named <top>.<file_ending>
-FILE_RTL_TOP	:= $(wildcard ${DIR_RTL}/$(call fun_get_prj_config_var,top).*)
+FILE_RTL_TOP	:= $(wildcard ${DIR_RTL}/$(call fun_get_build_config_var,top).*)
 VIO_CTRL_TOP	:= $(call fun_get_prj_config_var,vio_top)
 
 # SCRIPT_CREATE_PROJECT	:= ${DIR_SCRIPTS_XIL}/create_project.tcl
