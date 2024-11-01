@@ -103,7 +103,7 @@ proc mcm_xips_generate_xips {} {
 proc mcm_xips_export_sim {simulator export_dir} {
     global xil_ip_precompile_path
     export_simulation   -lib_map_path $xil_ip_precompile_path/$simulator    \
-                        -of_objects [get_ips] -simulator $simulator         \
+                        -of_objects [get_ips xip_*] -simulator $simulator         \
                         -directory $export_dir -absolute_path -force
 }
 
