@@ -120,8 +120,8 @@ proc _mcm_alveo_ip_prj {} {
     update_compile_order -fileset sources_1
     update_compile_order -fileset sim_1
 
-    set d_project_config [::json::json2dict [read [open project_config.json r]]]
-    set top         [dict get $d_project_config top]
+    set d_build_config [::json::json2dict [read [open build_config.json r]]]
+    set top         [dict get $d_build_config top]
     set_property top $top [get_filesets sources_1]
 }
 
@@ -235,8 +235,7 @@ proc _mcm_alveo_ip_edit_in_prj {dir_alveo_export} {
 # MAIN API
 ############################################################
 
-# creates an alveo-targeted export of the current top level module 
-# (project_config)
+# creates an alveo-targeted export of the current top level module (build_config)
 # TODO: where to set up the clock associations, register coniguration etc? there 
 # needs to be some user-editable file in a nice format (probably json because 
 # vivado) at a specific location.
