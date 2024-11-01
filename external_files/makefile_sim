@@ -15,6 +15,8 @@ MAKE_XIL_SIM			:= make -f ${FILE_MAKE_XIL_SIM}
 include ${DIR_MAKE_SIM_XILINX}/../var.mk
 include ${DIR_MAKE_SIM_XILINX}/../scripts_xil/var.mk
 
+MAKE_DUMMY_SIM_GLBLV_COMP_SUCCESS	:= ${SIMULATOR}/.glblv_compilation_successful
+
 ##############################
 # PREPARE
 ##############################
@@ -47,6 +49,7 @@ ${SCRIPT_RUN_SIM}: ${DIR_XIPS_SIM_OUT} ${FILE_PROJECT_CONFIG}
 			tb_${SIM_TOP}						\
 			${DIR_XIPS_SIM_OUT}					\
 			${DIR_XIL_IP_PRECOMPILE}			\
+			${LIB_NAME_XIL_GLBL}			    \
 			"${SIM_ARGS}"
 	@echo "Simulation run script ${SCRIPT_RUN_SIM} successfully created"
 
@@ -76,7 +79,23 @@ ${SIMULATOR}_xip_export_compile:	${DIR_XIPS_SIM_OUT}
 	${MAKE_XIL_SIM} ${SIMULATOR}_xip_compile
 
 # main entry target to run compilation for all SIMULATION-EXPORTED xilinx IPs
-${SIMULATOR}_xip_compile:	$(addsuffix _compile,$(addprefix ${SIMULATOR}_,${LIST_XIPS_SIM}))
+${SIMULATOR}_xip_compile: 	$(addsuffix _compile,$(addprefix ${SIMULATOR}_,${LIST_XIPS_SIM})) \
+							${VSIM_LIB_XIL_GLBL}
+	@:
+
+${VSIM_LIB_XIL_GLBL}: ${MAKE_DUMMY_SIM_GLBLV_COMP_SUCCESS}
+
+# dummy target for the glbl.v lib LIB_NAME_XIL_GLBL
+# (target has no dependencies for simplicity. In theory you almost never have to 
+# re-execute this because glbl.v doesn't change, but the absolutely 
+# insignificant amount of time it takes up does not justify any more complex 
+# code here. Just make sure the lib is there and the module compiled into it)
+${MAKE_DUMMY_SIM_GLBLV_COMP_SUCCESS}:
+	if [[ ! -z "${LIST_XIPS_SIM}" ]]; then \
+		mkdir -p ${SIMULATOR} && cd ${SIMULATOR} && vlib xil_glbl; \
+		vlog -work xil_glbl ${FILE_VIVADO_GLBLV}; \
+	fi
+	@touch $@
 
 # (doesn't look like that, but in practice the pattern rule evaluates into the 
 # prerequisites of modelsim_xip_compile)

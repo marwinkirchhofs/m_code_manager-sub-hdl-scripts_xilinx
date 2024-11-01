@@ -19,6 +19,9 @@ DIR_XIPS        		:= ${DIR_PRJ_TOP}/xips
 DIR_SCRIPTS_XIL 		:= ${DIR_PRJ_TOP}/scripts_xil
 DIR_XIP_CTRL			:= ${DIR_PRJ_TOP}/xip_ctrl
 
+SCRIPT_LOCATE_VIVADO	:= ${DIR_SCRIPTS_XIL}/locate_vivado_install.bash
+VIVADO_INSTALL_PATH		:= $(shell bash ${SCRIPT_LOCATE_VIVADO})
+
 SCRIPT_CREATE_PROJECT	:= ${DIR_SCRIPTS_XIL}/create_project.tcl
 SCRIPT_MANAGE_PROJECT	:= ${DIR_SCRIPTS_XIL}/manage_project.tcl
 SCRIPT_READ_SOURCES		:= ${DIR_SCRIPTS_XIL}/read_sources.tcl
@@ -32,6 +35,9 @@ SCRIPT_VIO_CTRL			:= ${DIR_SCRIPTS_XIL}/vio_ctrl.tcl
 endif
 
 SRC_XDC					:= $(wildcard ${DIR_CONSTRAINTS}/*.xdc)
+
+LIB_NAME_XIL_GLBL		:= xil_glbl
+VSIM_LIB_XIL_GLBL		:= ${DIR_SIM}/${SIMULATOR}/${LIB_NAME_XIL_GLBL}
 
 ##############################
 # IP SOURCES
@@ -59,5 +65,13 @@ DIR_XIL_IP_PRECOMPILE	:= $(call fun_get_prj_config_var,xil_ip_precompile_path)/$
 XIL_DEBUG_CORE_FILES := $(addsuffix .tcl,                                   \
                             $(addprefix ${DIR_XIPS}/xips_debug_cores_,${SRC_MODULES}))
 
+##############################
+# OTHERS
+##############################
+
+# Vivado glbl.v module (simulation module that vivado IPs require - most 
+# reliable if simply loaded from the installation directory)
+
+FILE_VIVADO_GLBLV		:= ${VIVADO_INSTALL_PATH}/data/verilog/src/glbl.v
 
 endif
