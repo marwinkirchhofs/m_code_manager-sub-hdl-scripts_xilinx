@@ -21,20 +21,6 @@ MAKE_DUMMY_SIM_GLBLV_COMP_SUCCESS	:= ${SIMULATOR}/.glblv_compilation_successful
 # PREPARE
 ##############################
 
-# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-# TODO: The sim generation scripts has the big problem that it fails if the ip 
-# sources are vhdl and not verilog... The reason: When linking to the libs in 
-# the vivado-generated IP export directory, I currently rename the libs, in the 
-# sense that I prepend every lib with the unique IP name that I gave the IP.  
-# I think the reason were some ambiguity problems, where 2 IPs would use the 
-# same libs, and then I don't remember anymore what was the problem with just 
-# linking to one of the two IP exports, since it's only a lib anyways. I mean, 
-# sounds like it should work, but something tells me there is a reason I added 
-# the suffix. The actual problem is that vhdl defines the library names in the 
-# source files, meaning you basically can't use different library names (unless 
-# you sed the source files...)
-# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
 # TODO: do whatever makes sense	if the simulator is anything else than modelsim 
 # or questa
 .PHONY: ${SIMULATOR}_prepare
@@ -98,7 +84,7 @@ ${MAKE_DUMMY_SIM_GLBLV_COMP_SUCCESS}:
 	@touch $@
 
 # (doesn't look like that, but in practice the pattern rule evaluates into the 
-# prerequisites of modelsim_xip_compile)
+# prerequisites of ${SIMULATOR}_xip_compile)
 # bash nop inserted in order for make to detect the rule. Empty rule gets not 
 # detected, maybe because of something in the backend of how pattern rules are 
 # processed, I might be in the mood to check that out another day.
@@ -149,3 +135,5 @@ ${DIR_XIPS_SIM_OUT}:	${LIST_XIPS_XCI}
 	@touch $@
 
 endif
+
+# vim: ft=make
