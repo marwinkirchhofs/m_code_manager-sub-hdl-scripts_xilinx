@@ -36,7 +36,9 @@ include ${DIR_MAKE_SIM_XILINX}/../scripts_xil/var.mk
 # TODO: do whatever makes sense	if the simulator is anything else than modelsim 
 # or questa
 .PHONY: ${SIMULATOR}_prepare
-${SIMULATOR}_prepare:
+${SIMULATOR}_prepare: ${SCRIPT_RUN_SIM}
+
+${SCRIPT_RUN_SIM}: ${DIR_XIPS_SIM_OUT} ${FILE_PROJECT_CONFIG}
 	source ${SCRIPT_CREATE_SIM_SCRIPTS}		\
 			${SIMULATOR}						\
 			${SCRIPT_RUN_SIM}					\
