@@ -114,7 +114,7 @@ ${SIMULATOR}_xip_%_compile:		${DIR_XIPS_SIM_OUT}/xip_%/${SIMULATOR}/${SIMULATOR}
 ${DIR_XIPS_SIM_OUT}/xip_%/${SIMULATOR}/${SIMULATOR}_lib:
 	cd $(dir $@) && ( [[ -s xip_$*.sh ]] && source xip_$*.sh ) || touch simulation_failed
 	[[ -d $@/msim/xil_defaultlib/xip_$*_opt ]] && rm -rd $@/msim/xil_defaultlib/xip_$*_opt || :
-	[[ -z "$(find $(abspath $(dir $@)) -name '*.mem')" ]] || 	\
+	[[ -z "$$(find $(abspath $(dir $@)) -name '*.mem')" ]] || 	\
 		cp $(abspath $(dir $@))/*.mem ${SIMULATOR}
 
 .PHONY: xip_export_sim
