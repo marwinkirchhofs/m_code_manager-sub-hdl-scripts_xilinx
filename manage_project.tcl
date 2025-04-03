@@ -13,11 +13,11 @@ proc mcm_prj_set_hw_platform {part {board_part ""}} {
 proc mcm_prj_update {} {
     # update the vivado project, based on the variables as they are set in the 
     # project config json file
-    set d_project_config [::json::json2dict                             \
-                        [read [open project_config.json r]]]
-    set part        [dict get $d_project_config part]
-    set board_part  [dict get $d_project_config board_part]
-    set top         [dict get $d_project_config top]
+    set d_build_config [::json::json2dict                             \
+                        [read [open build_config.json r]]]
+    set part        [dict get $d_build_config part]
+    set board_part  [dict get $d_build_config board_part]
+    set top         [dict get $d_build_config top]
 
     mcm_prj_set_hw_platform $part $board_part
     set_property top $top [get_filesets sources_1]
