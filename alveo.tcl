@@ -12,18 +12,23 @@
 package require json
 
 source scripts_xil/read_sources.tcl
+source scripts_xil/generate_xips.tcl
+source scripts_xil/manage_project.tcl
+
+# specific tcl file for specifying IPs within the alveo kernel design, to make 
+# sure only those are loaded into the IP export
+set file_xips_alveo xips/xips_alveo.tcl
 
 # TODO: allow for specifying a kernel xml, for users who want all the options 
 # and know how to do that
 # TODO: allow specifying kernel files which provide a c simulation model or 
 # something like that
-# TODO: the example explicitly sets XPM libraries, guess I have to do that as 
-# well if I use any
 
 # project name: directory name two hierarchy levels upwards
 set prj_name [file tail [file dirname [file dirname [file normalize [info script]]]]]
 
 set file_ip_config "alveo_ip_config.json"
+set file_build_config "build_config.json"
 
 set dir_build "build"
 # TODO: turned out: it was a stupid idea to hardcode the IP output directory, so 
@@ -54,6 +59,10 @@ proc _mcm_alveo_ip_get_ip_name {file_ip_config} {
         set ip_name [dict get $d_ip_config $prj_name]
     }
     return $ip_name
+}
+
+proc _mcm_alveo_ip_create_clk {name} {
+    ipx::infer_bus_interface $name xilinx.com:signal:clock_rtl:1.0 [ipx::current_core]
 }
 
 # set up all associated clocks for bus interfaces and resets
@@ -104,16 +113,30 @@ proc _mcm_alveo_ip_associate_mem_busif {reg_name bus_if_name} {
 # FLOW STEPS
 ############################################################
 
-# create an in-memory project for exporting the IP
+# create a project for exporting the IP
+# allows for both setting up a project, or doing it in-memory. The in-memory 
+# option is for automated build flows, once everything works, the project is for 
+# debugging/inspection/running step-by-step if something goes wrong.
 # (the reason for not using the existing project is that I don't want to clutter 
 # that with the IP, and that I have seen errors happening with dubious duplicate 
 # top level module warnings, which exported fine but in the end didn't correctly 
 # work in vitis. so fresh project, full control, always). The command removes 
 # anything that is there already to be sure that the export is clean.
-proc _mcm_alveo_ip_prj {} {
-    # TODO
-    create_project -in_memory
+# :prj_path: used to switch between project and in-memory flow - if non-empty, 
+# a project is created at this path, otherwise an in-memory project is used
+proc _mcm_alveo_ip_prj {{prj_path ""}} {
+    if {$prj_path eq ""} {
+        create_project -in_memory
+    } else {
+        set ip_name [_mcm_alveo_ip_get_ip_name $file_ip_config]
+        create_project -name ip_prj_${ip_name} -dir $prj_path
+    }
     _mcm_prj_read_hdl_sources_synth
+    # general project management function from manage_project.tcl, to apply some 
+    # fields from build_config.json - sets the "part" and "board_part" 
+    # properties, and sets the top module
+    mcm_prj_update
+    mcm_xips_generate_xips $file_xips_alveo
     # TODO: it might be necessary to also process constraints here, don't know 
     # if you apply them in the IP or later when you do the implementation in 
     # vivado
@@ -176,27 +199,33 @@ proc _mcm_alveo_ip_export_xo {file_ip_config dir_alveo_export} {
 # }
 proc _mcm_alveo_ip_load_user_config {file_ip_config} {
 
-    # TODO: name
+    # TODO: name -> should actually already be there, in _mcm_alveo_ip_export_xo
     set d_ip_config [::json::json2dict [read [open $file_ip_config r]]]
     set ip_interfaces [dict get $d_ip_config "interfaces"]
     dict for {intf intf_config} $ip_interfaces {
-        # associate clock
-        _mcm_alveo_ip_associate_clk                     \
-                $intf                                   \
-                [dict get $intf_config "type"]          \
-                [dict get $intf_config "clock"]
-        # associate busif
-        # TODO: seems like that part just doesn't work yet, fix it
-        if {[dict exists $intf_config "registers"]} {
-            dict for {reg_name reg_config} [dict get $intf_config "registers"] {
-                _mcm_alveo_ip_create_register           \
-                        $reg_name                       \
-                        [dict get $reg_config "size"]   \
-                        [dict get $reg_config "offset"]
-                if {[dict exists $reg_config "associated_busif"]} {
-                    _mcm_alveo_ip_associate_mem_busif   \
-                            $reg_name                   \
-                            [dict get $reg_config "associated_busif"]
+        if {[dict get $intf_config "type"] == "clock"} {
+            # if it's a clock, just create it (and make sure you don't try to 
+            # associate a clock with a clock)
+            _mcm_alveo_ip_create_clk $intf
+        } else {
+            # associate clock
+            _mcm_alveo_ip_associate_clk                     \
+                    $intf                                   \
+                    [dict get $intf_config "type"]          \
+                    [dict get $intf_config "clock"]
+            # associate busif
+            # TODO: seems like that part just doesn't work yet, fix it
+            if {[dict exists $intf_config "registers"]} {
+                dict for {reg_name reg_config} [dict get $intf_config "registers"] {
+                    _mcm_alveo_ip_create_register           \
+                            $reg_name                       \
+                            [dict get $reg_config "size"]   \
+                            [dict get $reg_config "offset"]
+                    if {[dict exists $reg_config "associated_busif"]} {
+                        _mcm_alveo_ip_associate_mem_busif   \
+                                $reg_name                   \
+                                [dict get $reg_config "associated_busif"]
+                    }
                 }
             }
         }
@@ -204,12 +233,26 @@ proc _mcm_alveo_ip_load_user_config {file_ip_config} {
 }
 
 proc _mcm_alveo_ip_configure {file_ip_config} {
+    set core [ipx::current_core]
     foreach user_param [ipx::get_user_parameters] {
-      ipx::remove_user_parameter [get_property NAME $user_param] [ipx::current_core]
+      ipx::remove_user_parameter [get_property NAME $user_param] $core
     }
     _mcm_alveo_ip_enable_vitis
     _mcm_alveo_ip_load_user_config $file_ip_config
-    ipx::create_xgui_files [ipx::current_core]
+    ipx::create_xgui_files $core
+
+    # code effectively from tutorial design, I don't know where to find 
+    # documentation for these fields
+    # https://github.com/Xilinx/Vitis-Tutorials/tree/2024.1/Hardware_Acceleration/Feature_Tutorials/01-rtl_kernel_workflow
+    set d_ip_config [::json::json2dict [read [open $file_ip_config r]]]
+    set xpm_libs_raw [dict get $d_ip_config "xpm"]
+    set xpm_libs {}
+    foreach xpm_lib $xpm_libs_raw {
+        lappend xpm_libs [string cat XPM_ [string toupper $xpm_lib]]
+    }
+    set_property xpm_libraries $xpm_libs $core
+    set_property supported_families {} $core
+    set_property auto_family_support_level level_2 $core
 }
 
 # prepare everything for vitis export
@@ -239,10 +282,11 @@ proc _mcm_alveo_ip_edit_in_prj {dir_alveo_export} {
 # TODO: where to set up the clock associations, register coniguration etc? there 
 # needs to be some user-editable file in a nice format (probably json because 
 # vivado) at a specific location.
-proc mcm_alveo_ip_export {file_ip_config dir_alveo_export} {
+# :prj_path: see _mcm_alveo_ip_prj
+proc mcm_alveo_ip_export {file_ip_config dir_alveo_export {prj_path ""}} {
 
-    # create in-memory-project
-    _mcm_alveo_ip_prj
+    # create project
+    _mcm_alveo_ip_prj prj_path
     # package IP
     _mcm_alveo_ip_package_core $dir_alveo_export
     # open IP in project
@@ -250,10 +294,6 @@ proc mcm_alveo_ip_export {file_ip_config dir_alveo_export} {
     # configure IP
     _mcm_alveo_ip_configure $file_ip_config
 
-#     set_property xpm_libraries {XPM_CDC XPM_MEMORY XPM_FIFO} [ipx::
-    #     current_core]
-#     set_property supported_families { } [ipx::current_core]
-    set_property auto_family_support_level level_2 [ipx::current_core]
     ipx::update_checksums [ipx::current_core]
     ipx::save_core [ipx::current_core]
     close_project -delete

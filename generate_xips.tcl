@@ -84,9 +84,16 @@ proc _mcm_xips_process_xip_dict {xips} {
     }
 }
 
-proc mcm_xips_generate_xips {} {
+proc mcm_xips_generate_xips {{xip_file ""}} {
     # iterate through all RTL modules and process their IPs
-    set list_xip_files [glob -nocomplain xips/xips_*.tcl]
+    if {$xip_file eq ""} {
+        set list_xip_files [glob -nocomplain xips/xips_*.tcl]
+    } else {
+        set list_xip_files {}
+        if {file exists $xip_file} {
+            lappend list_xip_files $xip_file
+        }
+    }
     foreach xip_file $list_xip_files {
         source $xip_file
         puts $xips
