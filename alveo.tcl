@@ -27,7 +27,7 @@ set file_xips_alveo xips/xips_alveo.tcl
 # project name: directory name two hierarchy levels upwards
 set prj_name [file tail [file dirname [file dirname [file normalize [info script]]]]]
 
-set file_ip_config "alveo_ip_config.json"
+set file_ip_config "alveo/alveo_ip_config.json"
 set file_build_config "build_config.json"
 
 set dir_build "build"
@@ -125,6 +125,9 @@ proc _mcm_alveo_ip_associate_mem_busif {reg_name bus_if_name} {
 # :prj_path: used to switch between project and in-memory flow - if non-empty, 
 # a project is created at this path, otherwise an in-memory project is used
 proc _mcm_alveo_ip_prj {{prj_path ""}} {
+    global file_ip_config
+    global file_xips_alveo
+
     if {$prj_path eq ""} {
         create_project -in_memory
     } else {
@@ -286,7 +289,7 @@ proc _mcm_alveo_ip_edit_in_prj {dir_alveo_export} {
 proc mcm_alveo_ip_export {file_ip_config dir_alveo_export {prj_path ""}} {
 
     # create project
-    _mcm_alveo_ip_prj prj_path
+    _mcm_alveo_ip_prj $prj_path
     # package IP
     _mcm_alveo_ip_package_core $dir_alveo_export
     # open IP in project

@@ -90,7 +90,7 @@ proc mcm_xips_generate_xips {{xip_file ""}} {
         set list_xip_files [glob -nocomplain xips/xips_*.tcl]
     } else {
         set list_xip_files {}
-        if {file exists $xip_file} {
+        if {[file exists $xip_file]} {
             lappend list_xip_files $xip_file
         }
     }
