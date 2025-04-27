@@ -140,6 +140,12 @@ proc _mcm_alveo_ip_prj {{prj_path ""}} {
     # properties, and sets the top module
     mcm_prj_update
     mcm_xips_generate_xips $file_xips_alveo
+
+    # make sure that no conditionally included files are left out that is 
+    # actually used by hardware emulation (downside: if there is a file that is 
+    # ONLY included if not XILINX_SIMULATOR, that's not ignored...)
+    set_property verilog_define XILINX_SIMULATOR=1 [get_filesets sources_1]
+
     # TODO: it might be necessary to also process constraints here, don't know 
     # if you apply them in the IP or later when you do the implementation in 
     # vivado
