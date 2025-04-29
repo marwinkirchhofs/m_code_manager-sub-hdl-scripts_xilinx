@@ -257,7 +257,7 @@ proc _mcm_alveo_ip_configure {file_ip_config} {
     set xpm_libs_raw [dict get $d_ip_config "xpm"]
     set xpm_libs {}
     foreach xpm_lib $xpm_libs_raw {
-        lappend xpm_libs [string cat XPM_ [string toupper $xpm_lib]]
+        lappend xpm_libs XPM_[string toupper $xpm_lib]
     }
     set_property xpm_libraries $xpm_libs $core
     set_property supported_families {} $core
