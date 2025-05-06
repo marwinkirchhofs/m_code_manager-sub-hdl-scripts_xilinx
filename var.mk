@@ -9,6 +9,7 @@ include ${DIR_VAR_MAKE_XILINX}/../var.mk
 # TODO: this needs to go somewhere in the xilinx-respective scripts (maybe 
 # a make var there that gets included by this one?)
 XIL_TOOL 				:= vivado
+XIL_SIM 				:= xsim
 XIL_PRJ_NAME			:= ${PRJ_NAME}
 DIR_XIL_PRJ				:= ${DIR_PRJ_TOP}/_vivado_prj
 XIL_PRJ					:= ${DIR_XIL_PRJ}/${XIL_PRJ_NAME}.xpr
