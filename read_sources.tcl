@@ -32,6 +32,7 @@ proc _mcm_prj_read_hdl_sources_synth {} {
 
 proc _mcm_prj_read_hdl_sources_sim {} {
     set dir_tb "tb"
+    set dir_rtl "rtl"
 #     set tb_generic_sv   [mcm_util_find_files $dir_tb *.sv]
 #     set tb_sv           [mcm_util_find_files $dir_tb */*.sv]
     set tb_sv [list]
