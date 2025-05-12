@@ -3,6 +3,7 @@
 ifndef _MAKE_TOP_
 _MAKE_TOP_ := 1
 
+include scripts/util.mk
 include var.mk
 include scripts_xil/var.mk
 
