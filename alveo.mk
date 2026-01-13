@@ -1,0 +1,492 @@
+
+# !! NOT MEANT AS STANDALONE MAKEFILE !!
+# Hence no shebang. The point is for this file to be included by this repo's 
+# makefile_top. The reason to make it a separate file is simply clean scripting.  
+# This makefile is alveo-only, which only applies to a minority of usecases of 
+# the repo, so it seems like you don't want to clutter makefile_top with 
+# anything that is purely alveo-related.
+
+# TODO: for software, automatically determine the memory bank for shared 
+# arguments
+# TODO: document that for the necessary linked libs, take the examples as 
+# a guideline, but you might have to experiment here and there (possibly 
+# depending on compiler configuration)
+# TODO: support naming runs
+# TODO: write a alveo_help target, with quick one-liner explanations for all 
+# targets
+
+# DIR_VPP_BUILD		:= /shares/bulk/mkirchhofs/vitis_ws_nfe_temp
+DIR_VPP_BUILD		:= $(call fun_get_build_config_var,v++_temp_dir)
+ifeq (${DIR_VPP_BUILD},)
+DIR_VPP_BUILD		:= _x
+endif
+DIR_VPP_VIVADO_PRJ	:= ${DIR_VPP_BUILD}/link/vivado/vpl/prj
+DIR_VPP_VIVADO_IMPL	:= ${DIR_VPP_VIVADO_PRJ}/prj.runs/impl_1
+VPP_TIMING_RPT_LAST	:= $(shell ls -t ${DIR_VPP_VIVADO_IMPL}/*timing*.rpt | head -n 1)
+
+# variable can be set by either build_config.json, or manually 
+# passed/overwritten as a shell variable (see text output for target 
+# ${FILE_IP_XO})
+ALVEO_IP_PRJ_PATH	:= $(call fun_get_build_config_var,alveo_kernel_ip_prj_dir)
+
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+# TEMPORARY
+# problem: I need all the software include directories, but I haven't set it up 
+# hierarchically. So I do that manually - for the time being. Eventually 
+# I should turn that into cmake, but right now I just want the code to run, 
+# quality of workflow comes later.
+DIR_SW_SRC_AUX		:= ${DIR_SW}/include ${DIR_SW_SRC}/core \
+			${DIR_SW_SRC}/core/types ${DIR_SW_SRC}/core/qstate ${DIR_SW_SRC}/core/util
+ALVEO_SW_INCLUDE_AUX	:= $(addprefix -I,${DIR_SW_SRC_AUX})
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+# general comment: The way that this workflow is set up is to follow classical 
+# vivado design style as closely as possible. Therefore it does not make use of 
+# any v++ vivado cfg, which would have been possible as well and might seem more 
+# familiar to people that come from HLS.  Rather it exports to vivado as soon as 
+# possibel and then gets back a fully implemented design, which only needs to be 
+# linked into a xclbin by vitis. I want to be able to give my design constraints 
+# the way I'm used to, I want to be able to watch my reports and do timing 
+# closure the way I'm used to, and I want to be able to look into the actual 
+# schematic and device routing if necessary.
+
+SCRIPT_ALVEO			:= ${DIR_SCRIPTS_XIL}/alveo.tcl
+SCRIPT_ALVEO_LOAD_XDC	:= ${DIR_SCRIPTS_XIL}/alveo_load_xdc.tcl
+SCRIPT_UTIL_INI_FILE	:= ${DIR_SCRIPTS_XIL}/util_ini_file.py
+
+DIR_ALVEO_EXPORT		:= ${DIR_BUILD}/alveo
+DIR_ALVEO_CFG			:= ${DIR_PRJ_TOP}/alveo
+DIR_ALVEO_HW			:= ${DIR_ALVEO_EXPORT}/hw
+DIR_ALVEO_EMU			:= ${DIR_ALVEO_EXPORT}/hw_emu
+# (important to live-evaluate, because directory might not exist yet when 
+# calling the makefile, for instance when triggering a run)
+DIR_ALVEO_EMU_RUN		= ${DIR_ALVEO_EMU}/.run/$(shell ls -t ${DIR_ALVEO_EMU}/.run 2>/dev/null | head -n 1)
+# (hard-coded directory of the emulation flow
+DIR_ALVEO_EMU_RUN_XSIM	= ${DIR_ALVEO_EMU_RUN}/hw_emu/device0/binary_0/behav_waveform/xsim
+DIR_IMPL_DCP			:= ${DIR_VPP_VIVADO_PRJ}/prj.runs/impl_1
+
+# (needs to be defined before the config file evaluation functions)
+FILE_IP_CONFIG			:= ${DIR_ALVEO_CFG}/alveo_ip_config.json
+
+DEVICE_ALVEO			:= $(call fun_get_build_config_var,device)
+# TODO: no idea if it's a smart idea to suppress the error message if 
+# ${FILE_IP_CONFIG} doesn't exist or "name" is not set. But in the likely case 
+# you are not designing for alveo, you would get it every time which is 
+# annoying.
+ALVEO_IP_NAME			:= $(shell python3 ${FILE_READ_JSON_VAR} ${FILE_IP_CONFIG} name 2>/dev/null)
+ifeq (${ALVEO_IP_NAME},)
+ALVEO_IP_NAME := ${PRJ_NAME}
+endif
+VIVADO_NUM_JOBS			:= $(call fun_get_prj_config_var,vivado_jobs)
+ifeq (${VIVADO_NUM_JOBS},)
+VIVADO_NUM_JOBS	:= 1
+endif
+
+FILE_IP_XO				:= ${DIR_ALVEO_EXPORT}/xo/${ALVEO_IP_NAME}.xo
+FILE_HW_BIN_HOST		:= ${DIR_ALVEO_HW}/${ALVEO_IP_NAME}_host
+FILE_HW_XCLBIN			:= ${DIR_ALVEO_HW}/${ALVEO_IP_NAME}.xclbin
+FILE_HW_EMU_BIN_HOST	:= ${DIR_ALVEO_EMU}/${ALVEO_IP_NAME}_host
+FILE_HW_EMU_XCLBIN		:= ${DIR_ALVEO_EMU}/${ALVEO_IP_NAME}.xclbin
+FILE_HW_EMU_XCLBIN_PACKAGED	:= ${DIR_ALVEO_EMU}/${ALVEO_IP_NAME}_packaged.xclbin
+FILE_HW_EMU_EMCONFIG	:= ${DIR_ALVEO_EMU}/emconfig.json
+LINK_HW_EMU_XRT_INI		:= ${DIR_ALVEO_EMU}/xrt.ini
+FILE_HW_EMU_XRT_INI		:= ${DIR_ALVEO_CFG}/xrt.ini
+FILE_HW_VPP_CFG			:= ${DIR_ALVEO_CFG}/alveo_${ALVEO_IP_NAME}.cfg
+FILE_HOST_APP_ARGS		:= ${DIR_ALVEO_CFG}/alveo_host_app_args
+FILE_HW_EMU_WAVECONFIG	:= ${DIR_ALVEO_CFG}/alveo_emu_waveconfig.tcl
+FILE_HW_EMU_WDB			:= ${DIR_ALVEO_EMU}/${ALVEO_IP_NAME}_emu.wdb
+# (again important to live-evaluate, file might just be generated by make 
+# target)
+FILE_HW_EMU_WDB_AUTO	= $(shell ls -t ${DIR_ALVEO_EMU_RUN_XSIM}/*.wdb 2>/dev/null | head -n 1)
+FILE_IMPL_DCP			:= $(shell ls -t ${DIR_IMPL_DCP}/*.dcp 2>/dev/null | head -n 1)
+DUMMY_NO_IMPL_DCP		:= _no_impl_dcp_
+ifeq (${FILE_IMPL_DCP},)
+FILE_IMPL_DCP := ${DUMMY_NO_IMPL_DCP}
+endif
+
+# COMMAND LINE OPTIONS
+ifneq (${TO_STEP},)
+VPP_FLAG_TO_STEP		:= --to_step vpl.${TO_STEP}
+endif
+# how to provide host app args? They can be made permanent via file, or provided 
+# per run via env variable. env variable takes precedence (it's only one or the 
+# other, never are both applied)
+# !!! note that the xclbin file is ALWAYS the first argument (without the need 
+# to specify it) !!!
+# 1. env var: pass HOST_APP_ARGS to make
+# 2. set up arguments in ${FILE_HOST_APP_ARGS} -> the file is cat'ed into the 
+# command arguments
+ifeq (${HOST_APP_ARGS},)
+HOST_APP_ARGS			:= $(shell [[ -f ${FILE_HOST_APP_ARGS} ]] && cat ${FILE_HOST_APP_ARGS})
+endif
+
+
+############################################################
+# TOOL SETUP
+############################################################
+
+VPP						:= v++
+CXX						:= g++
+# allow using vanilla gdb as fallback if xgdb is not fully set up (have seen 
+# that happening on a hardware platform server)
+ifneq (${NO_XGDB},)
+C_DEBUG					:= gdb
+else
+C_DEBUG					:= xgdb
+endif
+# CXX					:= /opt/apps/xilinx/Vitis/2021.2/gnu/aarch64/lin/aarch64-linux/bin/aarch64-linux-gnu-g++
+
+##############################
+# FLAGS
+##############################
+
+FLAGS_NUM_JOBS			:= --vivado.synth.jobs ${VIVADO_NUM_JOBS} --vivado.impl.jobs ${VIVADO_NUM_JOBS}
+
+# SOFTWARE BUILD
+
+# c++ std: xrt needs c++14 minimum, but I'm using <filesystem> which is c++17
+# TODO: make the c++ standard a field in some build config. Just not exactly 
+# sure where yet, but probably it would be build_config, because this doesn't 
+# only apply to alveo, but also to embedded applications
+CXXFLAGS_EMU := -I${DIR_SW_SRC} ${ALVEO_SW_INCLUDE_AUX} \
+			-I${XILINX_XRT}/include -I${XILINX_VIVADO}/include \
+			-g -Wall -O0 -fmessage-length=0 -std=c++17
+CXXFLAGS_HW := -I${DIR_SW_SRC} ${ALVEO_SW_INCLUDE_AUX} \
+			-I${XILINX_XRT}/include -I${XILINX_VIVADO}/include \
+			-Wall -fmessage-length=0 -std=c++17
+# allow for hardware host application to be compiled for either debugging or 
+# deployment (default is debugging)
+ifeq (${HW_OPT},)
+CXXFLAGS_HW	+= -g -O0
+else
+CXXFLAGS_HW	+= -O3
+endif
+
+# (turned out that I need the uuid lib for xclbin, although the uuid lib include 
+# is nowhere to be seen in the examples. maybe different compiler setting, 
+# apparently there was a change at some point in whether or not the compiler 
+# implicitly includes the prerequisites for libs)
+LDFLAGS := -L${XILINX_XRT}/lib -lxrt_coreutil -luuid -lstdc++
+
+# HARDWARE LINK
+VPPFLAGS_CFG := --config ${FILE_HW_VPP_CFG}
+# TODO: I'm not sure yet if it's a good or a bad idea to include the config file 
+# in hw_emu as well. On the one hand, that means that the hardware emu gets all 
+# the constraints thrown at it that are not meant for it, but maybe it just 
+# ignores them. On the other hand, the emu flow should get the information on 
+# number of kernels and connectivity, should there ever be any. And that is the 
+# same file, afaik nothing I can do about it.
+# !!! keep the save-temps !!! otherwise, after creating the xclbin file, vitis 
+# deletes the link project, which contains the copied source files. Meaning 
+# simulation/emulation can't reference the source files anymore, and if you have 
+# a classical (xsim pseudo-)deadloop, that's much easier to find if you can step 
+# through the source files
+VPPFLAGS_COMMON	:= --platform ${DEVICE_ALVEO} \
+				   --temp_dir ${DIR_VPP_BUILD} --save-temps \
+				   ${FLAGS_NUM_JOBS} ${VPPFLAGS_CFG}
+VPPFLAGES_EMU	:= -g
+VPPFLAGES_EMU_PROFILE	:= --profile.data all:all:all --profile.memory=all
+
+############################################################
+# BUILD/RUN
+############################################################
+
+.PHONY: alveo_run
+alveo_run: alveo_hw_run
+
+.PHONY: alveo_build
+alveo_build: alveo_hw_build
+
+##############################
+# HARDWARE RUN
+##############################
+
+# RUN
+.PHONY: alveo_hw_run
+alveo_hw_run: alveo_hw_check_up_to_date_sw alveo_hw_check_up_to_date_hw
+	${FILE_HW_BIN_HOST} ${FILE_HW_XCLBIN} ${HOST_APP_ARGS}
+
+.PHONY: alveo_hw_debug
+alveo_hw_debug: alveo_hw_check_up_to_date_sw alveo_hw_check_up_to_date_hw
+	${C_DEBUG} --args ${FILE_HW_BIN_HOST} ${FILE_HW_XCLBIN} ${HOST_APP_ARGS}
+
+HW_OUT_OF_DATE	= $(call fun_check_target_out_of_date,${FILE_HW_XCLBIN})
+.PHONY: alveo_hw_check_up_to_date_hw
+alveo_hw_check_up_to_date_hw:
+	@[[ ! -z "${HW_OUT_OF_DATE}" ]] && \
+		echo "****************************************" && \
+		echo "WARNING: ${FILE_HW_XCLBIN} out-of-date" && \
+		echo "****************************************" && \
+		echo "" || :
+
+SW_OUT_OF_DATE	= $(call fun_check_target_out_of_date,${FILE_HW_BIN_HOST})
+.PHONY: alveo_hw_check_up_to_date_sw
+alveo_hw_check_up_to_date_sw:
+	@[[ ! -z "${SW_OUT_OF_DATE}" ]] && \
+		echo "****************************************" && \
+		echo "WARNING: ${FILE_HW_BIN_HOST} out-of-date" && \
+		echo "****************************************" && \
+		echo "" || :
+
+##############################
+# HARDWARE BUILD
+##############################
+
+.PHONY: alveo_hw_build
+alveo_hw_build: ${FILE_HW_XCLBIN} ${FILE_HW_BIN_HOST}
+
+# TODO: Not sure if it'll be unideal to depend on all constraints files, in case 
+# a project has like different builds and only one of them is for alveo (meaning 
+# that there would be constraints files present that totally don't apply to the 
+# alveo build). Think it's a problem that is reasonable to delay until it does 
+# occur.
+${FILE_HW_XCLBIN}: ${FILE_IP_XO} ${FILE_BUILD_CONFIG} ${FILE_HW_VPP_CFG} ${SRC_XDC}
+	${VPP} --link --target hw \
+			${VPPFLAGS_COMMON} ${VPP_FLAG_TO_STEP} -o $@ $<
+
+${FILE_HW_VPP_CFG}:
+	@python3 ${SCRIPT_UTIL_INI_FILE} ${FILE_HW_VPP_CFG} vpp_config \
+			vivado prop run.impl_1.STEPS.PLACE_DESIGN.TCL.PRE=${SCRIPT_ALVEO_LOAD_XDC}
+
+.PHONY: alveo_hw_build_sw
+alveo_hw_build_sw: ${FILE_HW_BIN_HOST}
+
+# (note that you need to put the linker flags at the end, after any source code 
+# - for those not super familiar with c/c++ linking like me for instance)
+# ${FILE_HW_BIN_HOST}: ${SRC_SW_ALL}
+${FILE_HW_BIN_HOST}: ${SRC_SW_C} ${SRC_SW_CPP}
+	${CXX} ${CXXFLAGS_HW} ${SRC_SW_CPP} -o $@ ${LDFLAGS}
+
+##############################
+# HARDWARE INSPECT
+##############################
+
+.PHONY: alveo_hw_open_prj
+alveo_hw_open_prj: alveo_hw_check_up_to_date_hw
+	${XIL_TOOL} -mode tcl ${DIR_VPP_VIVADO_PRJ}/prj.xpr
+
+.PHONY: alveo_hw_open_prj_gui
+alveo_hw_open_prj_gui: alveo_hw_check_up_to_date_hw
+	${XIL_TOOL} -mode gui ${DIR_VPP_VIVADO_PRJ}/prj.xpr
+
+.PHONY: alveo_hw_open_timing
+alveo_hw_open_timing: alveo_hw_check_up_to_date_hw
+	less ${VPP_TIMING_RPT_LAST}
+
+# open the last implemented dcp in the vivado gui
+.PHONY: alveo_hw_open_dcp
+alveo_hw_open_dcp: alveo_hw_dcp_check_up_to_date
+	${XIL_TOOL} -mode tcl ${FILE_IMPL_DCP}
+
+.PHONY: alveo_hw_open_dcp_gui
+alveo_hw_open_dcp_gui: alveo_hw_dcp_check_up_to_date
+	${XIL_TOOL} -mode gui ${FILE_IMPL_DCP}
+
+# helper target to display a warning before running alveo_hw_dcp that the 
+# implementation might not be up-to-date with the sources (which could be 
+# totally intentional of course)
+# (essentially has the "source file" leaf prerequisites of ${FILE_HW_XCLBIN})
+.PHONY: alveo_hw_dcp_check_up_to_date
+alveo_hw_dcp_check_up_to_date: ${FILE_IMPL_DCP}
+${FILE_IMPL_DCP}: ${SRC_RTL} ${SRC_XDC}
+ifeq (${FILE_IMPL_DCP},${DUMMY_NO_IMPL_DCP})
+	@echo "ERROR: No post-implementation design checkpoint available at ${DIR_IMPL_DCP}"
+	@exit 1
+else
+	@echo ""
+	@echo "**** WARNING ****"
+	@echo "It appears that the last implemented DCP is not up-to-date with the \
+	sources or constraints! Might be intentional, but just sayin'..."
+	@echo ""
+endif
+
+##############################
+# HW-EMU TARGET
+##############################
+
+# TODO: doc - you need the XCL_EMULATION_MODE (maybe find out what it does, but 
+# no way without it)
+.PHONY: alveo_emu_run
+alveo_emu_run: \
+		${LINK_HW_EMU_XRT_INI} alveo_emu_check_up_to_date_sw alveo_emu_check_up_to_date_hw
+ifeq (${KEEP_RUN},)
+	@echo "********************************************************************************"
+	@echo "!!! RUN DATA, INCLUDING WAVEFORM, WILL BE REMOVED AFTER RUN TO SAVE MEMORY !!!"
+	@echo "(directory: ${DIR_ALVEO_EMU}/.run)"
+	@echo "To prevent, define env variable KEEP_RUN (value doesn't matter)"
+	@echo "********************************************************************************"
+	@echo ""
+endif
+	XCL_EMULATION_MODE=hw_emu ${FILE_HW_EMU_BIN_HOST} \
+							${FILE_HW_EMU_XCLBIN_PACKAGED} ${HOST_APP_ARGS}
+	@make ${FILE_HW_EMU_WDB}
+ifeq (${KEEP_RUN},)
+	make alveo_emu_clean_last_run
+endif
+
+.PHONY: alveo_emu_debug
+alveo_emu_debug: \
+		${LINK_HW_EMU_XRT_INI} alveo_emu_check_up_to_date_sw alveo_emu_check_up_to_date_hw
+ifeq (${KEEP_RUN},)
+	@echo "********************************************************************************"
+	@echo "!!! RUN DATA, INCLUDING WAVEFORM, WILL BE REMOVED AFTER RUN TO SAVE MEMORY !!!"
+	@echo "(directory: ${DIR_ALVEO_EMU}/.run)"
+	@echo "To prevent, define env variable KEEP_RUN (value doesn't matter)"
+	@echo "********************************************************************************"
+	@echo ""
+endif
+	XCL_EMULATION_MODE=hw_emu ${C_DEBUG} \
+			   --args ${FILE_HW_EMU_BIN_HOST} ${FILE_HW_EMU_XCLBIN_PACKAGED} ${HOST_APP_ARGS}
+	@make ${FILE_HW_EMU_WDB}
+ifeq (${KEEP_RUN},)
+	make alveo_emu_clean_last_run
+endif
+
+.PHONY: alveo_emu_xrt_ini
+alveo_emu_xrt_ini: ${LINK_HW_EMU_XRT_INI}
+
+# why links with absolute paths, although that is not git-compatible? The link 
+# is in the build directory, which is not supposed to be version-managed.  
+# Therefore this only has to work locally, and then abs path is more convenient 
+# because I have the variables, and more robust because it doesn't break should 
+# any of the two locations change.
+# (explanation: rm -f such that
+${LINK_HW_EMU_XRT_INI}: ${FILE_HW_EMU_XRT_INI}
+	@[[ -L $@ ]] || \
+			{ rm -f $@; ln -s ${FILE_HW_EMU_XRT_INI} ${LINK_HW_EMU_XRT_INI}; }
+
+# (should you be asking yourself why you can't just pass everything to 
+# SCRIPT_UTIL_INI_FILE here, instead of the bash conditional, because it creates 
+# the file iff it doesn't exist: If the file doesn't exist, you want it to 
+# default to debug_mode=batch.  But if you pass that to the python script, it 
+# will set debug_mode to batch even if the file exists. 1. Then the file is 
+# touched, even if it wouldn't have had to, and depending build flows must 
+# repeat. 2. If the file exists and debug_mode is set, you want to preserve that 
+# (and don't write) unless XRT_WAVE is set.)
+# Also note that if people manage to remove debug_mode, but keep the file, the 
+# target does not recover from that. People need to know at least a bit what 
+# they are doing.
+.PHONY: ${FILE_HW_EMU_XRT_INI}
+${FILE_HW_EMU_XRT_INI}:
+	@[[ -f ${FILE_HW_EMU_XRT_INI} ]] || \
+			printf "[Emulation]\ndebug_mode=batch" > ${FILE_HW_EMU_XRT_INI}
+ifneq (${XRT_WAVE},)
+	@python3 ${SCRIPT_UTIL_INI_FILE} ${FILE_HW_EMU_XRT_INI} xrt_ini Emulation debug_mode ${XRT_WAVE}
+endif
+
+EMU_HW_OUT_OF_DATE	= $(call fun_check_target_out_of_date,${FILE_HW_EMU_XCLBIN_PACKAGED})
+.PHONY: alveo_emu_check_up_to_date_hw
+alveo_emu_check_up_to_date_hw:
+	@[[ ! -z "${EMU_HW_OUT_OF_DATE}" ]] && \
+		echo "****************************************" && \
+		echo "WARNING: ${FILE_HW_EMU_XCLBIN_PACKAGED} out-of-date" && \
+		echo "****************************************" && \
+		echo "" || :
+
+EMU_SW_OUT_OF_DATE	= $(call fun_check_target_out_of_date,${FILE_HW_EMU_BIN_HOST})
+.PHONY: alveo_emu_check_up_to_date_sw
+alveo_emu_check_up_to_date_sw:
+	@[[ ! -z "${EMU_SW_OUT_OF_DATE}" ]] && \
+		echo "****************************************" && \
+		echo "WARNING: ${FILE_HW_EMU_BIN_HOST} out-of-date" && \
+		echo "****************************************" && \
+		echo "" || :
+
+
+.PHONY: alveo_emu_build
+alveo_emu_build: ${FILE_HW_EMU_EMCONFIG} ${FILE_HW_EMU_XCLBIN_PACKAGED} ${FILE_HW_EMU_BIN_HOST}
+
+# TODO: doc - note that you need the emconfig
+.PHONY: alveo_emu_emconfig
+alveo_emu_emconfig: ${FILE_HW_EMU_EMCONFIG}
+
+${FILE_HW_EMU_EMCONFIG}: ${FILE_BUILD_CONFIG}
+	emconfigutil --platform ${DEVICE_ALVEO} --od ${DIR_ALVEO_EMU}
+
+.PHONY: alveo_emu_build_sw
+alveo_emu_build_sw: ${FILE_HW_EMU_BIN_HOST}
+
+# (note that you need to put the linker flags at the end, after any source code 
+# - for those not super familiar with c/c++ linking like me for instance)
+# ${FILE_HW_EMU_BIN_HOST}: ${SRC_SW_ALL}
+${FILE_HW_EMU_BIN_HOST}: ${SRC_SW_C} ${SRC_SW_CPP}
+	${CXX} ${CXXFLAGS_EMU} ${SRC_SW_CPP} -o $@ ${LDFLAGS}
+
+.PHONY: alveo_emu_build_kernel
+alveo_emu_build_kernel: ${FILE_HW_EMU_XCLBIN_PACKAGED}
+
+${FILE_HW_EMU_XCLBIN}:	${FILE_IP_XO}
+	${VPP} --link --target hw_emu \
+			${VPPFLAGES_EMU} ${VPPFLAGES_EMU_PROFILE} ${VPPFLAGS_COMMON} -o $@ $<
+
+${FILE_HW_EMU_XCLBIN_PACKAGED}:	${FILE_HW_EMU_XCLBIN}
+	${VPP} --package --target hw_emu --platform ${DEVICE_ALVEO} $< -o $@
+
+${FILE_HW_EMU_WDB}: ${FILE_HW_EMU_WDB_AUTO}
+	@cp ${FILE_HW_EMU_WDB_AUTO} ${FILE_HW_EMU_WDB}
+
+.PHONY: alveo_emu_wave
+alveo_emu_wave:
+	${XIL_SIM} -gui -t ${FILE_HW_EMU_WAVECONFIG} ${FILE_HW_EMU_WDB}
+
+##############################
+# COMMON
+##############################
+
+# generates: xo
+.PHONY: alveo_kernel_ip
+alveo_kernel_ip: ${FILE_IP_XO}
+
+# TODO: in-memory flow is broken apparently
+${FILE_IP_XO}: ${SRC_RTL} ${FILE_IP_CONFIG}
+ifeq "${ALVEO_IP_PRJ_PATH}" ""
+	@echo "Generating the IP using a vivado in-memory flow"
+	@echo "To generate the IP using a persistent vivado project, set \
+		'alveo_kernel_ip_prj_dir' in 'build_config.json', or specify ALVEO_IP_PRJ_PATH"
+else
+	@echo "Generating the IP using a vivado project at ${ALVEO_IP_PRJ_PATH}"
+	[[ ! -d "${ALVEO_IP_PRJ_PATH}" ]] || rm -rd "${ALVEO_IP_PRJ_PATH}"
+endif
+	${XIL_TOOL} -mode batch -source ${SCRIPT_ALVEO} 				\
+			-tclargs ${FILE_IP_CONFIG} ${DIR_ALVEO_EXPORT} ${ALVEO_IP_PRJ_PATH}
+
+############################################################
+# UTIL
+############################################################
+
+# handy target to quickly see which cards are present in the system, and which 
+# revisions of these cards exactly
+# (doesn't check for correct system setup in any way and for host/platform 
+# compatibility, it's just here to set the correct part)
+# TODO: update to xrt-smi (with backwards compatibility, so check if xrt-smi 
+# exists, and if it doesn't fall back to xbutil
+.PHONY: alveo_detect_devices
+alveo_detect_devices:
+	@xbutil examine
+
+.PHONY: alveo_emu_clean_runs
+alveo_emu_clean_runs:
+	rm -rd ${DIR_ALVEO_EMU}/.run
+
+.PHONY: alveo_emu_clean_last_run
+alveo_emu_clean_last_run:
+	rm -rd ${DIR_ALVEO_EMU}/.run/$(ls -t ${DIR_ALVEO_EMU}/.run | head -n 1)
+
+##############################
+# ANALYSIS
+##############################
+# anything that the vitis analysis tools can do, for example if we can get the 
+# waveform thing going with hardware emulation
+
+# TODO: live waveform
+
+# I chose not to bother with an option to create a vitis workspace for software 
+# application debugging (at this point). Reason 1: So far, I was able to do it 
+# with gdb just fine. Reason 2: The whole Vitis UI/Vivado SDK thing, from my 
+# experience, is extremely prone to bugs/hickups, always leaves hidden residual 
+# files in case you want to re-initialize the workspace, and since the switch to 
+# Vitis Unified, the UI changes faster than I can say deadloop. Meanwhile gdb 
+# still going strong, and being essentially the same (BACKWARDS-COMPATIBLE) 
+# thing since I don't know how many decades.
+
+# vim: ft=make

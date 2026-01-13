@@ -193,6 +193,12 @@ run: run_hw_ctrl
 run_hw_ctrl:
 	${XIL_TOOL} -mode tcl -source ${SCRIPT_VIO_CTRL}
 
+# (included at the bottom in case the alveo workflow ever wants to refer to 
+# variables or targets defined in this main makefile. I consider that more 
+# likely to happen than the other way around, why would this makefile want to 
+# reference alveo-only variables or targets?
+include scripts_xil/alveo.mk
+
 # why do the include at the bottom, and not at the top of the makefile? In pure 
 # theory, this way user.mk can override top level makefile targets. Might be 
 # a rare case, because you completely remove the top level target (it's not like 
