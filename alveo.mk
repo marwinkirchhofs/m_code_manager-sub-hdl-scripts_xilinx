@@ -194,6 +194,9 @@ VPPFLAGES_EMU_PROFILE	:= --profile.data all:all:all --profile.memory=all
 .PHONY: alveo_run
 alveo_run: alveo_hw_run
 
+.PHONY: alveo_run_help
+alveo_run_help: alveo_hw_run_help
+
 .PHONY: alveo_build
 alveo_build: alveo_hw_build
 
@@ -205,6 +208,10 @@ alveo_build: alveo_hw_build
 .PHONY: alveo_hw_run
 alveo_hw_run: alveo_hw_check_up_to_date_sw alveo_hw_check_up_to_date_hw
 	${FILE_HW_BIN_HOST} ${FILE_HW_XCLBIN} ${HOST_APP_ARGS}
+
+.PHONY: alveo_hw_run_help
+alveo_hw_run_help: alveo_hw_check_up_to_date_sw alveo_hw_check_up_to_date_hw
+	@${FILE_HW_BIN_HOST} -h
 
 .PHONY: alveo_hw_debug
 alveo_hw_debug: alveo_hw_check_up_to_date_sw alveo_hw_check_up_to_date_hw
