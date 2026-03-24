@@ -261,7 +261,7 @@ alveo_hw_build_sw: ${FILE_HW_BIN_HOST}
 # (note that you need to put the linker flags at the end, after any source code 
 # - for those not super familiar with c/c++ linking like me for instance)
 # ${FILE_HW_BIN_HOST}: ${SRC_SW_ALL}
-${FILE_HW_BIN_HOST}: ${SRC_SW_C} ${SRC_SW_CPP}
+${FILE_HW_BIN_HOST}: ${SRC_SW_C} ${SRC_SW_CPP} ${SRC_SW_H}
 	${CXX} ${CXXFLAGS_HW} ${SRC_SW_CPP} -o $@ ${LDFLAGS}
 
 ##############################
